@@ -1,3 +1,4 @@
 target/
 /node_modules
 fuzz/Cargo.lock
+.idea/
