@@ -230,11 +230,33 @@ impl FileSystem for FileSystemOs {
                     VPath::Virtual(info) => Self::read_link(&info.physical_base_path()),
                     VPath::Native(path) => Self::read_link(&path),
                 }
+            } else if #[cfg(windows)] {
+                Ok(node_compatible_raw_canonicalize(fs::read_link(path)?))
             } else {
                 Self::read_link(path)
             }
         }
     }
+}
+
+#[cfg(windows)]
+const UNC_PATH_PREFIX: &[u8] = b"\\\\?\\UNC\\";
+#[cfg(windows)]
+const LONG_PATH_PREFIX: &[u8] = b"\\\\?\\";
+
+#[cfg(windows)]
+fn node_compatible_raw_canonicalize<P: AsRef<Path>>(path: P) -> PathBuf {
+    let path_bytes = path.as_ref().as_os_str().as_encoded_bytes();
+    path_bytes
+        .strip_prefix(UNC_PATH_PREFIX)
+        .or_else(|| path_bytes.strip_prefix(LONG_PATH_PREFIX))
+        .map_or_else(
+            || path.as_ref().to_path_buf(),
+            |p| {
+                // SAFETY: `as_encoded_bytes` ensures `p` is valid path bytes
+                unsafe { PathBuf::from(std::ffi::OsStr::from_encoded_bytes_unchecked(p)) }
+            },
+        )
 }
 
 #[test]
